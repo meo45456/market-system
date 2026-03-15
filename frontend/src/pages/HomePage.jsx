@@ -122,7 +122,7 @@ export default function HomePage() {
   const dateLabel = date ? new Date(date).toLocaleDateString('th-TH', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }) : ''
 
   return (
-    <div style={{ minHeight: '100vh', background: '#f8fafb', fontFamily: "'Sarabun', sans-serif", color: '#111827' }}>
+    <div style={{ minHeight: '100vh', background: '#f8fafb', fontFamily: "'Sarabun', sans-serif", color: '#111827', overflowX: 'hidden' }}>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@400;500;600;700&family=Prompt:wght@600;700;800;900&display=swap');
         @keyframes spin { to { transform: rotate(360deg) } }
@@ -138,7 +138,7 @@ export default function HomePage() {
 
       <Navbar />
 
-      <div style={{ maxWidth: 960, margin: '0 auto', padding: '20px 16px 80px' }}>
+      <div style={{ maxWidth: 960, margin: '0 auto', padding: '16px 12px 80px' }}>
 
         {/* ── Hero Header ── */}
         <div style={{ marginBottom: 20, animation: 'fadeUp 0.5s ease' }}>
@@ -196,7 +196,7 @@ export default function HomePage() {
             </label>
             <input ref={dateInputRef} type="date" min={today} value={date}
               onChange={e => setDate(e.target.value)}
-              style={{ width: '100%', background: date ? '#f0fdf4' : '#f9fafb', border: `2px solid ${date ? '#10b981' : '#e5e7eb'}`, borderRadius: 12, padding: '12px 16px', fontSize: 15, outline: 'none', color: '#111827', cursor: 'pointer', fontFamily: "'Sarabun',sans-serif", boxSizing: 'border-box', transition: 'border-color 0.2s' }}
+              style={{ width: '100%', background: date ? '#f0fdf4' : '#f9fafb', border: `2px solid ${date ? '#10b981' : '#e5e7eb'}`, borderRadius: 12, padding: '12px 16px', fontSize: 15, outline: 'none', color: '#111827', cursor: 'pointer', fontFamily: "'Sarabun',sans-serif", boxSizing: 'border-box', transition: 'border-color 0.2s', WebkitAppearance: 'none', appearance: 'none' }}
             />
           </div>
 
@@ -254,7 +254,7 @@ export default function HomePage() {
             {[1, 2].map(i => (
               <div key={i} style={{ marginBottom: 28 }}>
                 <div style={{ width: 120, height: 20, background: 'linear-gradient(90deg,#f3f4f6 25%,#e5e7eb 50%,#f3f4f6 75%)', backgroundSize: '400px 100%', borderRadius: 8, marginBottom: 14, animation: 'shimmer 1.4s infinite' }} />
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(100px,1fr))', gap: 10 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(90px,1fr))', gap: 10 }}>
                   {[1,2,3,4].map(j => (
                     <div key={j} style={{ height: 110, background: 'linear-gradient(90deg,#f3f4f6 25%,#e5e7eb 50%,#f3f4f6 75%)', backgroundSize: '400px 100%', borderRadius: 16, animation: `shimmer 1.4s infinite ${j * 0.1}s` }} />
                   ))}
@@ -291,7 +291,7 @@ export default function HomePage() {
                   </div>
 
                   {/* Stall Cards */}
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(100px,1fr))', gap: 10 }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(90px,1fr))', gap: 10 }}>
                     {zoneStalls.map(stall => {
                       const st = getStatus(stall)
                       const canBook = st.btn && user?.user_role === 'renter' && !hasActiveBooking
