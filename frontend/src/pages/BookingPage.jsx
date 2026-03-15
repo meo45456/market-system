@@ -14,7 +14,7 @@ export default function BookingPage() {
   const [loading, setLoading] = useState(false)
   const [lockLoading, setLockLoading] = useState(true)
   const [lockError, setLockError] = useState('')
-  const [timeLeft, setTimeLeft] = useState(600) // 10 นาที countdown
+  const [timeLeft, setTimeLeft] = useState(600)
   const lockedRef = useRef(false)
   const submittedRef = useRef(false)
 
@@ -44,7 +44,6 @@ export default function BookingPage() {
     }
   }, [])
 
-  // Countdown timer
   useEffect(() => {
     if (lockLoading) return
     const t = setInterval(() => {
@@ -189,7 +188,12 @@ export default function BookingPage() {
           </div>
           <div style={{ background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: 16, padding: 12, display: 'inline-block', marginBottom: 14 }}>
             <img src={`https://promptpay.io/${PROMPTPAY}/${stall.stall_rate}`} alt="QR"
-              style={{ width: 180, height: 180, borderRadius: 10, display: 'block' }} />
+              style={{ width: 180, height: 180, borderRadius: 10, display: 'block' }}
+              onError={e => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'flex' }} />
+            <div style={{ display: 'none', width: 180, height: 180, background: '#f0fdf4', border: '2px dashed #a7f3d0', borderRadius: 10, alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 8 }}>
+              <div style={{ fontSize: 32 }}>📱</div>
+              <div style={{ fontSize: 12, color: '#059669', fontWeight: 700, textAlign: 'center' }}>โอนผ่าน PromptPay<br/>{PROMPTPAY}</div>
+            </div>
           </div>
           <div style={{ fontSize: 13, color: '#6b7280', fontWeight: 600, marginBottom: 4 }}>{PROMPTPAY}</div>
           <div style={{ fontFamily: "'Prompt',sans-serif", fontSize: 32, fontWeight: 900, color: '#10b981', letterSpacing: '-0.5px' }}>฿{stall.stall_rate}</div>

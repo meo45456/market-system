@@ -156,7 +156,7 @@ export default function LandingPage() {
 
       {/* ── HERO ── */}
       <section style={{ minHeight:'100vh', position:'relative', overflow:'hidden', display:'flex', alignItems:'center' }}>
-        <img src="https://images.unsplash.com/photo-1488459716781-31db52582fe9?w=1600&q=80" alt="ตลาดเกษตร"
+        <img src="https://images.unsplash.com/photo-1488459716781-31db52582fe9?w=800&q=60&auto=format" alt="ตลาดเกษตร"
           style={{ position:'absolute', inset:0, width:'100%', height:'100%', objectFit:'cover', opacity:.3, filter:'saturate(1.3) brightness(.85)' }} />
         <div style={{ position:'absolute', inset:0, background:'linear-gradient(110deg,rgba(5,15,7,.98) 0%,rgba(5,15,7,.88) 45%,rgba(5,15,7,.35) 75%,rgba(5,15,7,.1) 100%)' }} />
         <div style={{ position:'absolute', bottom:0, left:0, right:0, height:220, background:'linear-gradient(to top,#050f07,transparent)' }} />
