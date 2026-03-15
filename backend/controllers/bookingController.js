@@ -122,7 +122,7 @@ const createBooking = async (req, res) => {
     await conn.query(
       `INSERT INTO payments (payment_id, booking_id, payment_amount, payment_method, payment_slipimage, payment_status)
        VALUES (?, ?, ?, ?, ?, 'pending')`,
-      [payment_id, final_booking_id, amount, payment_method || 'PromptPay', slip.filename]
+      [payment_id, final_booking_id, amount, payment_method || 'PromptPay', slip.path]
     );
 
     await conn.commit();
