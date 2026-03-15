@@ -42,7 +42,7 @@ export default function StaffDashboard() {
 
   const confirmAction = (type, b, p) => {
     const isApprove = type === 'approve'
-    const slipUrl = p?.payment_slipimage ? `${API_BASE}/uploads/${p.payment_slipimage}` : null
+    const slipUrl = p?.payment_slipimage || null
     MySwal.fire({
       title: (
         <div style={{ fontFamily: "'Prompt',sans-serif", fontSize: 18, fontWeight: 800, color: '#111827', display: 'flex', alignItems: 'center', gap: 8, justifyContent: 'center' }}>
