@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const multer = require('multer');
 const path = require('path');
-const { createBooking, getBookings, getBookingById, updateBookingStatus } = require('../controllers/bookingController');
+const { createBooking, getBookings, getBookingById, updateBookingStatus, cancelBooking } = require('../controllers/bookingController');
 const { authMiddleware, staffOnly, renterOnly } = require('../middleware/auth');
 
 const storage = multer.diskStorage({
@@ -12,12 +12,21 @@ const storage = multer.diskStorage({
     cb(null, 'slip-' + unique + path.extname(file.originalname));
   }
 });
-const upload = multer({ storage, limits: { fileSize: 5 * 1024 * 1024 } });
+const upload = multer({
+  storage,
+  limits: { fileSize: 5 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    const allowed = /jpeg|jpg|png|webp/;
+    if (allowed.test(path.extname(file.originalname).toLowerCase()) && allowed.test(file.mimetype))
+      cb(null, true);
+    else cb(new Error('อนุญาตเฉพาะไฟล์รูปภาพ'));
+  }
+});
 
-// POST จอง + แนบสลิปพร้อมกัน
-router.post('/', authMiddleware, renterOnly, upload.single('slip'), createBooking);
-router.get('/', authMiddleware, getBookings);
-router.get('/:id', authMiddleware, getBookingById);
-router.patch('/:id/status', authMiddleware, staffOnly, updateBookingStatus);
+router.post('/',             authMiddleware, renterOnly, upload.single('slip'), createBooking);
+router.get('/',              authMiddleware, getBookings);
+router.get('/:id',           authMiddleware, getBookingById);
+router.patch('/:id/status',  authMiddleware, staffOnly,  updateBookingStatus);
+router.delete('/:id',        authMiddleware, renterOnly, cancelBooking);  // ✅ ยกเลิกการจอง
 
 module.exports = router;

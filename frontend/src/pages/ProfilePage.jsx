@@ -2,10 +2,11 @@ import { useState, useEffect } from 'react'
 import Navbar from '../components/Navbar'
 import api from '../api'
 import { useAuth } from '../context/AuthContext'
-import Swal from 'sweetalert2' // 1. นำเข้า SweetAlert2
+import Swal from 'sweetalert2'
 
 const ZONES = ['โซนอาหาร', 'โซนผลไม้', 'โซนเสื้อผ้า', 'โซนของแห้ง']
 const ZONE_ICONS = { 'โซนอาหาร': '🍱', 'โซนผลไม้': '🍎', 'โซนเสื้อผ้า': '👕', 'โซนของแห้ง': '🧺' }
+const ZONE_DESC  = { 'โซนอาหาร': 'อาหาร / เครื่องดื่ม', 'โซนผลไม้': 'ผลไม้ / ผัก', 'โซนเสื้อผ้า': 'เสื้อผ้า / แฟชั่น', 'โซนของแห้ง': 'ของแห้ง / ของใช้' }
 
 export default function ProfilePage() {
   const [profile, setProfile] = useState(null)
@@ -20,154 +21,130 @@ export default function ProfilePage() {
     try {
       const res = await api.get('/renters/me')
       setProfile(res.data.data)
-      setForm({
-        renter_shopname: res.data.data.renter_shopname || '',
-        renter_zone: res.data.data.renter_zone || '',
-        renter_tel: res.data.data.renter_tel || '',
-      })
-    } catch {}
-    finally { setLoading(false) }
+      setForm({ renter_shopname: res.data.data.renter_shopname || '', renter_zone: res.data.data.renter_zone || '', renter_tel: res.data.data.renter_tel || '' })
+    } catch {} finally { setLoading(false) }
   }
 
   const handleSave = async () => {
     setSaving(true)
     try {
       await api.put('/renters/me', form)
-      
-      // 2. ใช้ SweetAlert2 เมื่อบันทึกสำเร็จ
-      Swal.fire({
-        icon: 'success',
-        title: 'บันทึกข้อมูลเรียบร้อย',
-        showConfirmButton: false,
-        timer: 1500, // ป๊อปอัพจะหายไปเองใน 1.5 วินาที
-        borderRadius: '20px',
-      })
-
+      Swal.fire({ icon: 'success', title: 'บันทึกสำเร็จ! 💾', showConfirmButton: false, timer: 1500 })
       fetchProfile()
     } catch (err) {
-      // 3. แจ้งเตือนข้อผิดพลาด
-      Swal.fire({
-        icon: 'error',
-        title: 'เกิดข้อผิดพลาด',
-        text: err.response?.data?.message || 'ไม่สามารถบันทึกข้อมูลได้',
-        confirmButtonColor: '#dc2626',
-      })
+      Swal.fire({ icon: 'error', title: 'เกิดข้อผิดพลาด', text: err.response?.data?.message, confirmButtonColor: '#10b981' })
     } finally { setSaving(false) }
   }
 
-  // Styles เดิมของคุณ
-  const inp = {
-    width: '100%', border: '1.5px solid #d1e3d8', borderRadius: '12px',
-    padding: '12px 14px', fontSize: '14px', outline: 'none',
-    background: '#f9fbfa', color: '#1a2e23', transition: 'all 0.2s',
-  }
-
   if (loading) return (
-    <div style={{ minHeight: '100vh', background: '#f4f7f5' }}>
+    <div style={{ minHeight: '100vh', background: '#f8fafb' }}>
       <Navbar />
-      <div style={{ textAlign: 'center', padding: '80px', color: '#9ca3af' }}>
-        <div style={{ fontSize: '36px', marginBottom: '12px', animation: 'pulse 1.5s infinite' }}>⏳</div>
-        <p>กำลังโหลด...</p>
+      <div style={{ textAlign: 'center', padding: 100 }}>
+        <div style={{ width: 40, height: 40, border: '4px solid #d1fae5', borderTop: '4px solid #10b981', borderRadius: '50%', animation: 'spin 0.8s linear infinite', margin: '0 auto' }} />
+        <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
       </div>
     </div>
   )
 
   return (
-    <div style={{ minHeight: '100vh', background: '#f4f7f5', fontFamily: "'Sarabun', sans-serif" }}>
-      <Navbar />
-      <div style={{ maxWidth: '520px', margin: '0 auto', padding: '20px 16px 40px' }}>
+    <div style={{ minHeight: '100vh', background: '#f8fafb', fontFamily: "'Sarabun',sans-serif", color: '#111827' }}>
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@400;500;600;700&family=Prompt:wght@700;800;900&display=swap');
+        @keyframes spin { to{transform:rotate(360deg)} }
+        @keyframes fadeUp { from{opacity:0;transform:translateY(14px)} to{opacity:1;transform:translateY(0)} }
+        .inp-field:focus { border-color: #10b981 !important; background: #fff !important; box-shadow: 0 0 0 3px rgba(16,185,129,0.12) !important; outline: none !important; }
+        .zone-card { transition: all 0.18s ease !important; }
+        .zone-card:hover { transform: translateY(-2px); box-shadow: 0 4px 14px rgba(16,185,129,0.15) !important; }
+        .save-btn:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 10px 28px rgba(16,185,129,0.45) !important; }
+      `}</style>
 
-        {/* Avatar Card */}
-        <div className="fade-in" style={{
-          background: 'linear-gradient(135deg, #0a3d20, #1a7a45)',
-          borderRadius: '20px', padding: '28px 20px', textAlign: 'center',
-          marginBottom: '14px', boxShadow: '0 8px 24px rgba(15,76,42,0.3)',
-        }}>
-          <div style={{
-            width: '72px', height: '72px', borderRadius: '50%',
-            background: 'rgba(255,255,255,0.2)', border: '3px solid rgba(255,255,255,0.4)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: '32px', margin: '0 auto 12px',
-          }}>🛒</div>
-          <h2 style={{ fontFamily: "'Prompt',sans-serif", fontSize: '20px', fontWeight: '700', color: '#fff', margin: '0 0 4px' }}>
-            {user?.user_name}
-          </h2>
-          <p style={{ color: 'rgba(255,255,255,0.7)', fontSize: '13px', margin: '0 0 10px' }}>ผู้เช่าแผงตลาด</p>
-          
-          {profile?.renter_zone && (
-            <div style={{
-              background: 'rgba(255,255,255,0.2)', borderRadius: '20px',
-              padding: '5px 14px', display: 'inline-flex', alignItems: 'center', gap: '6px', marginBottom: '8px',
-            }}>
-              <span style={{ fontSize: '14px' }}>{ZONE_ICONS[profile.renter_zone]}</span>
-              <span style={{ fontSize: '13px', color: '#fff', fontWeight: '600' }}>{profile.renter_zone}</span>
+      <Navbar />
+      <div style={{ maxWidth: 520, margin: '0 auto', padding: '20px 16px 80px' }}>
+
+        {/* ── Profile Hero ── */}
+        <div style={{ background: 'linear-gradient(135deg,#064e3b,#065f46)', borderRadius: 24, padding: '28px 24px', textAlign: 'center', marginBottom: 16, boxShadow: '0 8px 32px rgba(6,78,59,0.25)', animation: 'fadeUp 0.4s ease', position: 'relative', overflow: 'hidden' }}>
+          {/* Decorative blobs */}
+          <div style={{ position: 'absolute', width: 180, height: 180, borderRadius: '50%', background: 'rgba(255,255,255,0.04)', top: -60, right: -40, pointerEvents: 'none' }} />
+          <div style={{ position: 'absolute', width: 120, height: 120, borderRadius: '50%', background: 'rgba(16,185,129,0.1)', bottom: -30, left: -20, pointerEvents: 'none' }} />
+
+          <div style={{ position: 'relative', zIndex: 1 }}>
+            <div style={{ width: 72, height: 72, borderRadius: '50%', background: 'rgba(255,255,255,0.12)', border: '2px solid rgba(255,255,255,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 32, margin: '0 auto 14px', backdropFilter: 'blur(8px)' }}>🛒</div>
+            <h2 style={{ fontFamily: "'Prompt',sans-serif", fontSize: 20, fontWeight: 900, margin: '0 0 4px', color: '#fff' }}>{user?.user_name}</h2>
+            <p style={{ color: 'rgba(255,255,255,0.6)', fontSize: 13, margin: '0 0 16px' }}>ผู้เช่าแผงตลาด</p>
+
+            <div style={{ display: 'flex', justifyContent: 'center', gap: 10, flexWrap: 'wrap' }}>
+              {profile?.renter_zone && (
+                <div style={{ display: 'inline-flex', alignItems: 'center', gap: 7, background: 'rgba(255,255,255,0.12)', border: '1px solid rgba(255,255,255,0.2)', padding: '6px 16px', borderRadius: 20, backdropFilter: 'blur(8px)' }}>
+                  <span style={{ fontSize: 15 }}>{ZONE_ICONS[profile.renter_zone]}</span>
+                  <span style={{ fontSize: 13, fontWeight: 700, color: '#fff' }}>{profile.renter_zone}</span>
+                </div>
+              )}
+              {profile?.renter_citizenid && (
+                <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: 'rgba(255,255,255,0.12)', border: '1px solid rgba(255,255,255,0.2)', padding: '6px 14px', borderRadius: 20, backdropFilter: 'blur(8px)' }}>
+                  <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.8)', fontWeight: 500 }}>🪪 {profile.renter_citizenid}</span>
+                </div>
+              )}
             </div>
-          )}
+          </div>
         </div>
 
-        {/* Form Card */}
-        <div className="fade-in" style={{
-          background: '#fff', borderRadius: '20px', padding: '24px',
-          boxShadow: '0 2px 12px rgba(15,76,42,0.07)', border: '1px solid #e2ede7',
-        }}>
-          <h3 style={{ fontFamily: "'Prompt',sans-serif", fontSize: '15px', fontWeight: '600', color: '#0f4c2a', marginBottom: '18px' }}>
-            ✏️ แก้ไขข้อมูลร้านค้า
-          </h3>
+        {/* ── Edit Form ── */}
+        <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 24, padding: '24px', boxShadow: '0 4px 20px rgba(0,0,0,0.06)', animation: 'fadeUp 0.5s ease' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20, paddingBottom: 16, borderBottom: '1px solid #f3f4f6' }}>
+            <div style={{ width: 36, height: 36, borderRadius: 10, background: 'linear-gradient(135deg,#10b981,#059669)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16 }}>✏️</div>
+            <h3 style={{ fontFamily: "'Prompt',sans-serif", fontSize: 15, fontWeight: 800, margin: 0, color: '#111827' }}>แก้ไขข้อมูลร้านค้า</h3>
+          </div>
 
-          <div style={{ marginBottom: '14px' }}>
-            <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', color: '#4a6358', marginBottom: '6px' }}>🏪 ชื่อร้านค้า</label>
-            <input type="text" style={inp} value={form.renter_shopname}
+          {/* Shop Name */}
+          <div style={{ marginBottom: 16 }}>
+            <label style={{ display: 'block', fontSize: 13, fontWeight: 700, color: '#374151', marginBottom: 7 }}>🏪 ชื่อร้านค้า</label>
+            <input className="inp-field" type="text" value={form.renter_shopname}
               onChange={e => setForm({ ...form, renter_shopname: e.target.value })}
-              onFocus={e => { e.target.style.borderColor='#1a7a45'; e.target.style.background='#fff'; e.target.style.boxShadow='0 0 0 3px rgba(26,122,69,0.1)' }}
-              onBlur={e => { e.target.style.borderColor='#d1e3d8'; e.target.style.background='#f9fbfa'; e.target.style.boxShadow='none' }}
+              placeholder="เช่น ร้านข้าวแกงสมชาย"
+              style={{ width: '100%', background: '#f9fafb', border: '2px solid #e5e7eb', borderRadius: 12, padding: '12px 14px', fontSize: 14, color: '#111827', fontFamily: "'Sarabun',sans-serif", boxSizing: 'border-box', transition: 'all 0.2s' }}
             />
           </div>
 
-          <div style={{ marginBottom: '14px' }}>
-            <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', color: '#4a6358', marginBottom: '8px' }}>📍 โซนประเภทร้านค้า</label>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+          {/* Zone */}
+          <div style={{ marginBottom: 16 }}>
+            <label style={{ display: 'block', fontSize: 13, fontWeight: 700, color: '#374151', marginBottom: 10 }}>📍 โซนประเภทร้านค้า</label>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
               {ZONES.map(z => {
-                const selected = form.renter_zone === z
+                const sel = form.renter_zone === z
                 return (
-                  <button key={z} type="button" onClick={() => setForm({ ...form, renter_zone: z })} style={{
-                    padding: '10px 8px', borderRadius: '12px', border: '1.5px solid',
-                    borderColor: selected ? '#0f4c2a' : '#d1e3d8',
-                    background: selected ? '#e8f5ee' : '#f9fbfa',
-                    cursor: 'pointer', transition: 'all 0.18s',
-                  }}>
-                    <div style={{ fontSize: '20px', marginBottom: '3px' }}>{ZONE_ICONS[z]}</div>
-                    <div style={{ fontSize: '12px', fontWeight: selected ? '700' : '500', color: selected ? '#0f4c2a' : '#4a6358' }}>{z}</div>
+                  <button key={z} type="button" className="zone-card" onClick={() => setForm({ ...form, renter_zone: z })}
+                    style={{ padding: '12px 8px', borderRadius: 14, border: `2px solid ${sel ? '#10b981' : '#e5e7eb'}`, background: sel ? '#ecfdf5' : '#f9fafb', cursor: 'pointer', textAlign: 'center', boxShadow: sel ? '0 2px 10px rgba(16,185,129,0.2)' : 'none', position: 'relative' }}>
+                    {sel && <div style={{ position: 'absolute', top: 6, right: 8, fontSize: 11, color: '#059669', fontWeight: 800 }}>✓</div>}
+                    <div style={{ fontSize: 22, marginBottom: 4 }}>{ZONE_ICONS[z]}</div>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: sel ? '#059669' : '#374151' }}>{z}</div>
+                    <div style={{ fontSize: 10, color: sel ? '#10b981' : '#9ca3af', marginTop: 2 }}>{ZONE_DESC[z]}</div>
                   </button>
                 )
               })}
             </div>
           </div>
 
-          <div style={{ marginBottom: '14px' }}>
-            <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', color: '#4a6358', marginBottom: '6px' }}>📞 เบอร์โทรศัพท์</label>
-            <input type="text" style={inp} value={form.renter_tel}
-              onChange={e => setForm({ ...form, renter_tel: e.target.value })}
-              onFocus={e => { e.target.style.borderColor='#1a7a45'; e.target.style.background='#fff'; e.target.style.boxShadow='0 0 0 3px rgba(26,122,69,0.1)' }}
-              onBlur={e => { e.target.style.borderColor='#d1e3d8'; e.target.style.background='#f9fbfa'; e.target.style.boxShadow='none' }}
+          {/* Tel */}
+          <div style={{ marginBottom: 16 }}>
+            <label style={{ display: 'block', fontSize: 13, fontWeight: 700, color: '#374151', marginBottom: 7 }}>📞 เบอร์โทรศัพท์</label>
+            <input className="inp-field" type="tel" value={form.renter_tel}
+              onChange={e => setForm({ ...form, renter_tel: e.target.value.replace(/\D/g, '') })}
+              placeholder="0xx-xxx-xxxx" maxLength={10}
+              style={{ width: '100%', background: '#f9fafb', border: '2px solid #e5e7eb', borderRadius: 12, padding: '12px 14px', fontSize: 14, color: '#111827', fontFamily: "'Sarabun',sans-serif", boxSizing: 'border-box', transition: 'all 0.2s' }}
             />
           </div>
 
-          <div style={{ marginBottom: '18px' }}>
-            <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', color: '#4a6358', marginBottom: '6px' }}>🪪 เลขบัตรประชาชน</label>
-            <input type="text" style={{ ...inp, background: '#f0f5f2', color: '#9ca3af', cursor: 'not-allowed' }}
-              value={profile?.renter_citizenid || '-'} disabled />
+          {/* Citizen ID (readonly) */}
+          <div style={{ marginBottom: 24 }}>
+            <label style={{ display: 'block', fontSize: 13, fontWeight: 700, color: '#374151', marginBottom: 7 }}>🪪 เลขบัตรประชาชน <span style={{ fontSize: 11, color: '#9ca3af', fontWeight: 500 }}>(แก้ไขไม่ได้)</span></label>
+            <input type="text" value={profile?.renter_citizenid || '-'} disabled
+              style={{ width: '100%', background: '#f3f4f6', border: '2px solid #e5e7eb', borderRadius: 12, padding: '12px 14px', fontSize: 14, color: '#9ca3af', fontFamily: "'Sarabun',sans-serif", boxSizing: 'border-box', cursor: 'not-allowed' }}
+            />
           </div>
 
-          <button onClick={handleSave} disabled={saving} style={{
-            width: '100%',
-            background: saving ? '#9ca3af' : 'linear-gradient(135deg, #1a7a45, #0a3d20)',
-            color: '#fff', border: 'none', borderRadius: '12px',
-            padding: '14px', fontSize: '15px', fontWeight: '600',
-            cursor: saving ? 'not-allowed' : 'pointer',
-            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
-            boxShadow: saving ? 'none' : '0 4px 15px rgba(15,76,42,0.35)',
-          }}>
-            {saving ? 'กำลังบันทึก...' : '💾 บันทึกข้อมูล'}
+          <button className="save-btn" onClick={handleSave} disabled={saving}
+            style={{ width: '100%', background: saving ? '#d1d5db' : 'linear-gradient(135deg,#10b981,#059669)', color: saving ? '#9ca3af' : '#fff', border: 'none', borderRadius: 14, padding: '15px 0', fontSize: 15, fontWeight: 800, cursor: saving ? 'not-allowed' : 'pointer', boxShadow: saving ? 'none' : '0 6px 20px rgba(16,185,129,0.35)', fontFamily: "'Prompt',sans-serif", transition: 'all 0.2s' }}>
+            {saving ? '⏳ กำลังบันทึก...' : '💾 บันทึกข้อมูล'}
           </button>
         </div>
       </div>

@@ -17,11 +17,15 @@ const updateMyProfile = async (req, res) => {
   const { renter_shopname, renter_zone, renter_tel } = req.body;
   try {
     const [result] = await db.query(
-      'UPDATE renter SET renter_shopname = COALESCE(?, renter_shopname), renter_zone = COALESCE(?, renter_zone), renter_tel = COALESCE(?, renter_tel) WHERE user_id = ?',
+      `UPDATE renter
+       SET renter_shopname = COALESCE(?, renter_shopname),
+           renter_zone     = COALESCE(?, renter_zone),
+           renter_tel      = COALESCE(?, renter_tel)
+       WHERE user_id = ?`,
       [renter_shopname, renter_zone, renter_tel, req.user.user_id]
     );
     if (result.affectedRows === 0) return res.status(404).json({ success: false, message: 'ไม่พบข้อมูลผู้เช่า' });
-    res.json({ success: true, message: 'อัปเดตข้อมูลสำเร็จ' });
+    res.json({ success: true, message: 'อัปเดตสำเร็จ' });
   } catch (err) {
     res.status(500).json({ success: false, message: 'เกิดข้อผิดพลาด' });
   }

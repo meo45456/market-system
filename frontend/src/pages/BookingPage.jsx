@@ -1,8 +1,8 @@
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import Navbar from '../components/Navbar'
 import api from '../api'
-import Swal from 'sweetalert2' // 1. นำเข้า SweetAlert2
+import Swal from 'sweetalert2'
 
 const PROMPTPAY = '0808629507'
 
@@ -11,214 +11,224 @@ export default function BookingPage() {
   const navigate = useNavigate()
   const [slip, setSlip] = useState(null)
   const [preview, setPreview] = useState(null)
-  const [method, setMethod] = useState('PromptPay')
   const [loading, setLoading] = useState(false)
+  const [lockLoading, setLockLoading] = useState(true)
+  const [lockError, setLockError] = useState('')
+  const [timeLeft, setTimeLeft] = useState(600) // 10 นาที countdown
+  const lockedRef = useRef(false)
+  const submittedRef = useRef(false)
 
-  if (!state?.stall) { navigate('/'); return null }
+  if (!state?.stall) { navigate('/home'); return null }
   const { stall, date } = state
+
+  useEffect(() => {
+    if (lockedRef.current) return
+    lockedRef.current = true
+    const lockStall = async () => {
+      try {
+        await api.post(`/stalls/${stall.stall_id}/lock`, { market_date: date })
+        setLockLoading(false)
+      } catch (err) {
+        const msg = err.response?.data?.message || 'ไม่สามารถจองแผงนี้ได้'
+        setLockError(msg)
+        setLockLoading(false)
+        Swal.fire({ icon: 'error', title: 'ไม่สามารถจองได้', text: msg, confirmButtonColor: '#10b981' })
+          .then(() => navigate('/home'))
+      }
+    }
+    lockStall()
+    return () => {
+      if (!submittedRef.current) {
+        api.delete(`/stalls/${stall.stall_id}/lock`, { data: { market_date: date } }).catch(() => {})
+      }
+    }
+  }, [])
+
+  // Countdown timer
+  useEffect(() => {
+    if (lockLoading) return
+    const t = setInterval(() => {
+      setTimeLeft(p => {
+        if (p <= 1) {
+          clearInterval(t)
+          Swal.fire({ icon: 'warning', title: 'หมดเวลา', text: 'เวลาจองหมดแล้ว กรุณาเริ่มใหม่ครับ', confirmButtonColor: '#10b981' })
+            .then(() => navigate('/home'))
+          return 0
+        }
+        return p - 1
+      })
+    }, 1000)
+    return () => clearInterval(t)
+  }, [lockLoading])
 
   const handleFile = (e) => {
     const f = e.target.files[0]
     if (!f) return
-    
-    // ดักขนาดไฟล์เบื้องต้น (เช่น ไม่เกิน 5MB)
-    if (f.size > 5 * 1024 * 1024) {
-      Swal.fire('ไฟล์ใหญ่เกินไป', 'กรุณาเลือกรูปภาพขนาดไม่เกิน 5MB ครับ', 'warning')
-      return
-    }
-
-    setSlip(f)
-    setPreview(URL.createObjectURL(f))
+    if (f.size > 5 * 1024 * 1024) { Swal.fire('ไฟล์ใหญ่เกินไป', 'ไม่เกิน 5MB ครับ', 'warning'); return }
+    setSlip(f); setPreview(URL.createObjectURL(f))
   }
 
   const handleSubmit = async () => {
-    if (!slip) {
-      Swal.fire({ icon: 'warning', title: 'ลืมแนบสลิปหรือเปล่า?', text: 'กรุณาแนบสลิปการโอนเงินเพื่อยืนยันด้วยนะครับ', confirmButtonColor: '#0f4c2a' })
-      return
-    }
-
-    // 2. เพิ่มการยืนยันก่อนส่ง
-    const confirmResult = await Swal.fire({
-      title: 'ยืนยันการส่งข้อมูล?',
-      text: `แผง ${stall.stall_number} วันที่ ${dateStr} ยอดเงิน ฿${stall.stall_rate}`,
-      icon: 'question',
-      showCancelButton: true,
-      confirmButtonColor: '#1a7a45',
-      cancelButtonColor: '#6b7c72',
-      confirmButtonText: 'ใช่, ส่งข้อมูลเลย',
-      cancelButtonText: 'ตรวจสอบอีกครั้ง'
+    if (!slip) { Swal.fire({ icon: 'warning', title: 'ลืมแนบสลิป?', confirmButtonColor: '#10b981' }); return }
+    const confirm = await Swal.fire({
+      title: 'ยืนยันการจอง?', text: `แผง ${stall.stall_number} · ฿${stall.stall_rate}`,
+      icon: 'question', showCancelButton: true, confirmButtonColor: '#10b981',
+      cancelButtonColor: '#9ca3af', confirmButtonText: 'ยืนยัน', cancelButtonText: 'ยกเลิก',
     })
-
-    if (!confirmResult.isConfirmed) return
-
+    if (!confirm.isConfirmed) return
     setLoading(true)
-    
-    // แสดง Loading ระหว่างรอ Server ประมวลผล
-    Swal.fire({
-      title: 'กำลังอัปโหลด...',
-      text: 'กรุณารอสักครู่ ระบบกำลังบันทึกข้อมูลการจองของคุณ',
-      allowOutsideClick: false,
-      didOpen: () => { Swal.showLoading() }
-    })
-
+    Swal.fire({ title: 'กำลังอัปโหลด...', allowOutsideClick: false, didOpen: () => Swal.showLoading() })
     try {
       const fd = new FormData()
       fd.append('slip', slip)
       fd.append('stall_id', stall.stall_id)
       fd.append('market_date', date)
-      fd.append('payment_method', method)
+      fd.append('payment_method', 'PromptPay')
       fd.append('payment_amount', stall.stall_rate)
-      
       await api.post('/bookings', fd, { headers: { 'Content-Type': 'multipart/form-data' } })
-      
-      // 3. แจ้งเตือนเมื่อสำเร็จ
-      await Swal.fire({
-        icon: 'success',
-        title: 'ส่งคำขอจองเรียบร้อย!',
-        text: 'เจ้าหน้าที่จะตรวจสอบสลิปภายใน 24 ชม. ครับ',
-        confirmButtonColor: '#1a7a45',
-        timer: 3000
-      })
-
+      submittedRef.current = true
+      await Swal.fire({ icon: 'success', title: 'จองสำเร็จ! 🎉', text: 'เจ้าหน้าที่จะตรวจสอบภายใน 24 ชม.', confirmButtonColor: '#10b981', timer: 3000 })
       navigate('/my-bookings', { state: { success: true } })
     } catch (err) {
-      Swal.fire({
-        icon: 'error',
-        title: 'เกิดข้อผิดพลาด',
-        text: err.response?.data?.message || 'ไม่สามารถส่งข้อมูลได้ กรุณาลองใหม่ภายหลัง',
-        confirmButtonColor: '#dc2626'
-      })
-    } finally { 
-      setLoading(false) 
-    }
+      Swal.fire({ icon: 'error', title: 'เกิดข้อผิดพลาด', text: err.response?.data?.message || 'ลองใหม่อีกครั้ง', confirmButtonColor: '#10b981' })
+    } finally { setLoading(false) }
+  }
+
+  const handleCancel = async () => {
+    try { await api.delete(`/stalls/${stall.stall_id}/lock`, { data: { market_date: date } }) } catch {}
+    submittedRef.current = true
+    navigate('/home')
   }
 
   const dateStr = new Date(date).toLocaleDateString('th-TH', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' })
+  const mm = String(Math.floor(timeLeft / 60)).padStart(2, '0')
+  const ss = String(timeLeft % 60).padStart(2, '0')
+  const timerUrgent = timeLeft <= 120
+
+  if (lockLoading) return (
+    <div style={{ minHeight: '100vh', background: '#f8fafb', fontFamily: "'Sarabun',sans-serif" }}>
+      <Navbar />
+      <div style={{ textAlign: 'center', padding: '120px 20px' }}>
+        <div style={{ width: 56, height: 56, borderRadius: '50%', border: '4px solid #d1fae5', borderTop: '4px solid #10b981', animation: 'spin 0.8s linear infinite', margin: '0 auto 20px' }} />
+        <p style={{ color: '#6b7280', fontSize: 15, fontWeight: 600 }}>กำลังจองแผง {stall.stall_number}...</p>
+        <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
+      </div>
+    </div>
+  )
+
+  if (lockError) return null
 
   return (
-    <div style={{ minHeight: '100vh', background: '#f4f7f5', fontFamily: "'Sarabun', sans-serif" }}>
+    <div style={{ minHeight: '100vh', background: '#f8fafb', fontFamily: "'Sarabun',sans-serif", color: '#111827' }}>
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@400;500;600;700&family=Prompt:wght@600;700;800;900&display=swap');
+        @keyframes spin { to { transform: rotate(360deg) } }
+        @keyframes fadeUp { from { opacity:0; transform:translateY(14px) } to { opacity:1; transform:translateY(0) } }
+        @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.6} }
+        @keyframes urgentPulse { 0%,100%{background:#fef2f2;border-color:#fecaca} 50%{background:#fee2e2;border-color:#fca5a5} }
+        .upload-area:hover { border-color: #10b981 !important; background: #f0fdf4 !important; }
+        .btn-cancel:hover { background: #f3f4f6 !important; }
+      `}</style>
+
       <Navbar />
+      <div style={{ maxWidth: 480, margin: '0 auto', padding: '20px 16px 80px' }}>
 
-      <div style={{ maxWidth: '520px', margin: '0 auto', padding: '20px 16px 40px' }}>
-
-        {/* Steps indicator */}
-        <div className="fade-in" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0', marginBottom: '24px' }}>
-          {[
-            { n: '1', label: 'แจ้งโอน', active: true },
-            { n: '2', label: 'รออนุมัติ', active: false },
-            { n: '3', label: 'สำเร็จ', active: false },
-          ].map((step, i) => (
+        {/* ── Stepper ── */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 24, animation: 'fadeUp 0.4s ease' }}>
+          {[{ n: 1, label: 'แนบสลิป', active: true }, { n: 2, label: 'รออนุมัติ', active: false }, { n: 3, label: 'สำเร็จ', active: false }].map((s, i) => (
             <div key={i} style={{ display: 'flex', alignItems: 'center' }}>
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}>
-                <div style={{
-                  width: '32px', height: '32px', borderRadius: '50%', fontSize: '13px', fontWeight: '700',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  background: step.active ? '#0f4c2a' : '#e2ede7',
-                  color: step.active ? '#fff' : '#9ca3af',
-                  boxShadow: step.active ? '0 3px 10px rgba(15,76,42,0.3)' : 'none',
-                }}>{step.n}</div>
-                <span style={{ fontSize: '11px', fontWeight: step.active ? '600' : '400', color: step.active ? '#0f4c2a' : '#9ca3af' }}>{step.label}</span>
+              <div style={{ textAlign: 'center' }}>
+                <div style={{ width: 36, height: 36, borderRadius: '50%', fontSize: 13, fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 5px', fontFamily: "'Prompt',sans-serif", background: s.active ? 'linear-gradient(135deg,#10b981,#059669)' : '#fff', border: s.active ? 'none' : '2px solid #e5e7eb', color: s.active ? '#fff' : '#d1d5db', boxShadow: s.active ? '0 4px 14px rgba(16,185,129,0.4)' : 'none' }}>{s.n}</div>
+                <span style={{ fontSize: 11, color: s.active ? '#059669' : '#9ca3af', fontWeight: s.active ? 700 : 500 }}>{s.label}</span>
               </div>
-              {i < 2 && <div style={{ width: '40px', height: '2px', background: '#d1e3d8', margin: '0 4px', marginBottom: '18px' }} />}
+              {i < 2 && <div style={{ width: 48, height: 2, background: '#e5e7eb', margin: '0 8px 20px', borderRadius: 2 }} />}
             </div>
           ))}
         </div>
 
-        {/* Booking summary */}
-        <div className="fade-in" style={{
-          background: '#fff', borderRadius: '20px', padding: '20px',
-          marginBottom: '14px', boxShadow: '0 2px 12px rgba(15,76,42,0.07)',
-          border: '1px solid #e2ede7',
-        }}>
-          <h3 style={{ fontFamily: "'Prompt',sans-serif", fontSize: '15px', fontWeight: '600', color: '#0f4c2a', marginBottom: '14px' }}>
-            📋 รายละเอียดการจอง
-          </h3>
-          <div style={{ background: '#f4f7f5', borderRadius: '12px', padding: '16px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <span style={{ fontSize: '14px', color: '#6b7c72' }}>แผงหมายเลข</span>
-              <span style={{ fontSize: '18px', fontWeight: '700', color: '#0f4c2a', fontFamily: "'Prompt',sans-serif" }}>{stall.stall_number}</span>
+        {/* ── Timer Banner ── */}
+        <div style={{ borderRadius: 14, padding: '12px 16px', marginBottom: 16, display: 'flex', alignItems: 'center', justifyContent: 'space-between', animation: timerUrgent ? 'urgentPulse 1s infinite' : 'fadeUp 0.4s ease', background: timerUrgent ? '#fef2f2' : '#fffbeb', border: `1.5px solid ${timerUrgent ? '#fecaca' : '#fde68a'}` }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <span style={{ fontSize: 20, animation: timerUrgent ? 'pulse 1s infinite' : 'none' }}>{timerUrgent ? '🚨' : '⏳'}</span>
+            <div>
+              <div style={{ fontSize: 12, fontWeight: 700, color: timerUrgent ? '#dc2626' : '#b45309' }}>แผงถูกจองชั่วคราวให้คุณ</div>
+              <div style={{ fontSize: 11, color: timerUrgent ? '#ef4444' : '#92400e', marginTop: 1 }}>กรุณาแนบสลิปและยืนยันก่อนหมดเวลา</div>
             </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <span style={{ fontSize: '14px', color: '#6b7c72' }}>วันที่จอง</span>
-              <span style={{ fontSize: '14px', fontWeight: '600', color: '#1a2e23' }}>{dateStr}</span>
-            </div>
-            <div style={{ borderTop: '1px dashed #d1e3d8', marginTop: '6px', paddingTop: '10px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span style={{ fontSize: '14px', fontWeight: '600', color: '#4a6358' }}>ยอดเงินที่ต้องโอน</span>
-              <span style={{ fontSize: '24px', fontWeight: '800', color: '#1a7a45', fontFamily: "'Prompt',sans-serif" }}>฿{stall.stall_rate}</span>
-            </div>
+          </div>
+          <div style={{ fontFamily: "'Prompt',sans-serif", fontSize: 22, fontWeight: 900, color: timerUrgent ? '#dc2626' : '#b45309', background: timerUrgent ? '#fee2e2' : '#fef9c3', border: `1px solid ${timerUrgent ? '#fca5a5' : '#fde68a'}`, borderRadius: 10, padding: '4px 12px', minWidth: 72, textAlign: 'center' }}>
+            {mm}:{ss}
           </div>
         </div>
 
-        {/* QR Code */}
-        <div className="fade-in" style={{
-          background: '#fff', borderRadius: '20px', padding: '24px 20px',
-          marginBottom: '14px', boxShadow: '0 2px 12px rgba(15,76,42,0.07)',
-          border: '1px solid #e2ede7', textAlign: 'center',
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', marginBottom: '16px' }}>
-             <img src="https://upload.wikimedia.org/wikipedia/commons/c/c5/PromptPay-logo.png" alt="PromptPay" style={{ height: '24px' }} />
+        {/* ── Booking Info ── */}
+        <div style={{ background: '#fff', borderRadius: 20, padding: '18px', marginBottom: 14, boxShadow: '0 1px 3px rgba(0,0,0,0.06), 0 4px 16px rgba(0,0,0,0.04)', border: '1px solid #e5e7eb', animation: 'fadeUp 0.45s ease' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
+            <div style={{ width: 3, height: 18, background: 'linear-gradient(to bottom,#10b981,#059669)', borderRadius: 2 }} />
+            <span style={{ fontFamily: "'Prompt',sans-serif", fontSize: 14, fontWeight: 800, color: '#064e3b' }}>รายละเอียดการจอง</span>
           </div>
-          <div style={{ position: 'relative', display: 'inline-block', marginBottom: '16px' }}>
-            <img
-              src={`https://promptpay.io/${PROMPTPAY}/${stall.stall_rate}`}
-              alt="QR PromptPay"
-              style={{ width: '200px', height: '200px', borderRadius: '12px', padding: '10px', background: '#fff', border: '1px solid #eee' }}
-            />
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+            {[
+              { label: 'แผงหมายเลข', value: stall.stall_number, accent: true },
+              { label: 'โซน',         value: stall.stall_zone,   accent: false },
+              { label: 'วันที่',       value: dateStr,            accent: false, full: true },
+              { label: 'ค่าเช่า',      value: `฿${stall.stall_rate}`, accent: true },
+            ].map((item) => (
+              <div key={item.label} style={{ gridColumn: item.full ? '1/-1' : 'auto', background: item.accent ? '#ecfdf5' : '#f9fafb', border: `1px solid ${item.accent ? '#a7f3d0' : '#e5e7eb'}`, borderRadius: 12, padding: '11px 14px' }}>
+                <div style={{ fontSize: 11, color: '#6b7280', fontWeight: 600, marginBottom: 4 }}>{item.label}</div>
+                <div style={{ fontSize: item.accent ? 20 : 13, fontWeight: item.accent ? 900 : 600, color: item.accent ? '#059669' : '#111827', fontFamily: item.accent ? "'Prompt',sans-serif" : 'inherit', lineHeight: 1.3 }}>{item.value}</div>
+              </div>
+            ))}
           </div>
-          <p style={{ fontSize: '14px', fontWeight: '700', color: '#1a2e23', margin: '0 0 4px' }}>{PROMPTPAY}</p>
-          <p style={{ fontSize: '12px', color: '#9ca3af', margin: 0 }}>ชื่อบัญชี: ตลาดเกษตร มอ. (ทดสอบ)</p>
         </div>
 
-        {/* Upload Slip Area */}
-        <div className="fade-in" style={{
-          background: '#fff', borderRadius: '20px', padding: '20px',
-          marginBottom: '16px', boxShadow: '0 2px 12px rgba(15,76,42,0.07)',
-          border: '1px solid #e2ede7',
-        }}>
-          <h3 style={{ fontFamily: "'Prompt',sans-serif", fontSize: '15px', fontWeight: '600', color: '#0f4c2a', marginBottom: '16px' }}>
-            📸 อัปโหลดหลักฐานการโอน
-          </h3>
+        {/* ── QR PromptPay ── */}
+        <div style={{ background: '#fff', borderRadius: 20, padding: '20px', marginBottom: 14, textAlign: 'center', boxShadow: '0 1px 3px rgba(0,0,0,0.06), 0 4px 16px rgba(0,0,0,0.04)', border: '1px solid #e5e7eb', animation: 'fadeUp 0.5s ease' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16, justifyContent: 'center' }}>
+            <div style={{ width: 3, height: 18, background: 'linear-gradient(to bottom,#10b981,#059669)', borderRadius: 2 }} />
+            <span style={{ fontFamily: "'Prompt',sans-serif", fontSize: 14, fontWeight: 800, color: '#064e3b' }}>ชำระผ่าน PromptPay</span>
+          </div>
+          <div style={{ background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: 16, padding: 12, display: 'inline-block', marginBottom: 14 }}>
+            <img src={`https://promptpay.io/${PROMPTPAY}/${stall.stall_rate}`} alt="QR"
+              style={{ width: 180, height: 180, borderRadius: 10, display: 'block' }} />
+          </div>
+          <div style={{ fontSize: 13, color: '#6b7280', fontWeight: 600, marginBottom: 4 }}>{PROMPTPAY}</div>
+          <div style={{ fontFamily: "'Prompt',sans-serif", fontSize: 32, fontWeight: 900, color: '#10b981', letterSpacing: '-0.5px' }}>฿{stall.stall_rate}</div>
+          <div style={{ fontSize: 11, color: '#9ca3af', marginTop: 4 }}>สแกน QR ด้านบนเพื่อโอนเงิน</div>
+        </div>
 
-          <label style={{
-            display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-            width: '100%', minHeight: '180px', border: `2px dashed ${slip ? '#1a7a45' : '#d1e3d8'}`,
-            borderRadius: '16px', cursor: 'pointer', background: slip ? '#f0fdf4' : '#f9fbfa',
-            transition: 'all 0.2s', overflow: 'hidden'
-          }}>
+        {/* ── Upload Slip ── */}
+        <div style={{ background: '#fff', borderRadius: 20, padding: '18px', marginBottom: 18, boxShadow: '0 1px 3px rgba(0,0,0,0.06), 0 4px 16px rgba(0,0,0,0.04)', border: '1px solid #e5e7eb', animation: 'fadeUp 0.55s ease' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
+            <div style={{ width: 3, height: 18, background: 'linear-gradient(to bottom,#10b981,#059669)', borderRadius: 2 }} />
+            <span style={{ fontFamily: "'Prompt',sans-serif", fontSize: 14, fontWeight: 800, color: '#064e3b' }}>แนบสลิปโอนเงิน</span>
+            {slip && <span style={{ marginLeft: 'auto', background: '#ecfdf5', color: '#059669', border: '1px solid #a7f3d0', borderRadius: 20, padding: '2px 10px', fontSize: 11, fontWeight: 700 }}>✓ เลือกแล้ว</span>}
+          </div>
+          <label className="upload-area" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: 160, border: `2px dashed ${slip ? '#10b981' : '#d1d5db'}`, borderRadius: 16, cursor: 'pointer', background: slip ? '#f0fdf4' : '#fafafa', transition: 'all 0.2s', overflow: 'hidden' }}>
             {preview ? (
               <div style={{ position: 'relative', width: '100%', textAlign: 'center' }}>
-                <img src={preview} alt="preview" style={{ maxHeight: '220px', maxWidth: '100%', objectFit: 'contain' }} />
-                <div style={{ position: 'absolute', bottom: '10px', right: '10px', background: 'rgba(0,0,0,0.5)', color: '#fff', padding: '4px 12px', borderRadius: '20px', fontSize: '12px' }}>เปลี่ยนรูป</div>
+                <img src={preview} alt="slip" style={{ maxHeight: 220, maxWidth: '100%', objectFit: 'contain', borderRadius: 10 }} />
+                <div style={{ position: 'absolute', bottom: 10, right: 10, background: 'rgba(0,0,0,0.5)', color: '#fff', padding: '4px 12px', borderRadius: 20, fontSize: 11, fontWeight: 600, backdropFilter: 'blur(4px)' }}>เปลี่ยนรูป</div>
               </div>
             ) : (
-              <div style={{ textAlign: 'center' }}>
-                <div style={{ fontSize: '40px', marginBottom: '10px' }}>📁</div>
-                <p style={{ fontSize: '14px', color: '#4a6358', fontWeight: '600' }}>คลิกเพื่อเลือกรูปสลิป</p>
-                <p style={{ fontSize: '12px', color: '#9ca3af' }}>รองรับไฟล์ภาพ JPG, PNG</p>
+              <div style={{ textAlign: 'center', padding: '8px 0' }}>
+                <div style={{ width: 52, height: 52, background: '#f0fdf4', border: '1px solid #a7f3d0', borderRadius: 14, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24, margin: '0 auto 12px' }}>📎</div>
+                <div style={{ fontSize: 14, color: '#374151', fontWeight: 700, marginBottom: 4 }}>แตะเพื่อเลือกสลิป</div>
+                <div style={{ fontSize: 12, color: '#9ca3af' }}>JPG, PNG ไม่เกิน 5MB</div>
               </div>
             )}
             <input type="file" accept="image/*" style={{ display: 'none' }} onChange={handleFile} />
           </label>
         </div>
 
-        {/* Action Buttons */}
-        <div style={{ display: 'flex', gap: '12px' }}>
-          <button onClick={() => navigate('/')} disabled={loading} style={{
-            flex: 1, border: '1.5px solid #d1e3d8', background: '#fff',
-            color: '#6b7c72', borderRadius: '14px', padding: '14px',
-            fontSize: '15px', cursor: 'pointer', fontWeight: '600'
-          }}>
+        {/* ── Action Buttons ── */}
+        <div style={{ display: 'flex', gap: 10 }}>
+          <button className="btn-cancel" onClick={handleCancel} disabled={loading}
+            style={{ flex: 1, background: '#fff', border: '2px solid #e5e7eb', color: '#6b7280', borderRadius: 14, padding: '14px 0', fontSize: 14, cursor: 'pointer', fontWeight: 700, fontFamily: "'Sarabun',sans-serif", transition: 'all 0.18s' }}>
             ยกเลิก
           </button>
-          <button onClick={handleSubmit} disabled={loading || !slip} style={{
-            flex: 2,
-            background: (!slip || loading) ? '#9ca3af' : 'linear-gradient(135deg, #1a7a45, #0a3d20)',
-            color: '#fff', border: 'none', borderRadius: '14px', padding: '14px',
-            fontSize: '15px', fontWeight: '700', cursor: (!slip || loading) ? 'not-allowed' : 'pointer',
-            boxShadow: (!slip || loading) ? 'none' : '0 4px 15px rgba(15,76,42,0.35)',
-            transition: 'all 0.2s'
-          }}>
-            {loading ? 'กำลังส่งข้อมูล...' : 'ยืนยันการจอง'}
+          <button onClick={handleSubmit} disabled={loading || !slip}
+            style={{ flex: 2, background: (!slip || loading) ? '#e5e7eb' : 'linear-gradient(135deg,#10b981,#059669)', color: (!slip || loading) ? '#9ca3af' : '#fff', border: 'none', borderRadius: 14, padding: '14px 0', fontSize: 15, fontWeight: 800, cursor: (!slip || loading) ? 'not-allowed' : 'pointer', boxShadow: (!slip || loading) ? 'none' : '0 6px 20px rgba(16,185,129,0.4)', fontFamily: "'Prompt',sans-serif", transition: 'all 0.18s', letterSpacing: '0.2px' }}>
+            {loading ? '⏳ กำลังส่ง...' : '✅ ยืนยันการจอง'}
           </button>
         </div>
       </div>

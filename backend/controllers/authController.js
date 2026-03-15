@@ -13,9 +13,8 @@ const getNextId = async (table, prefix, idCol) => {
 const register = async (req, res) => {
   const { user_name, user_password, user_role, renter_shopname, renter_zone, renter_citizenid, renter_tel, staff_name, staff_tel } = req.body;
 
-  if (!user_name || !user_password || !user_role) {
+  if (!user_name || !user_password || !user_role)
     return res.status(400).json({ success: false, message: 'กรุณากรอกข้อมูลให้ครบ' });
-  }
 
   const conn = await db.getConnection();
   try {
@@ -29,7 +28,6 @@ const register = async (req, res) => {
 
     const hashed = await bcrypt.hash(user_password, 10);
     const user_id = await getNextId('users', 'u', 'user_id');
-
     await conn.query(
       'INSERT INTO users (user_id, user_name, user_password, user_role) VALUES (?, ?, ?, ?)',
       [user_id, user_name, hashed, user_role]
@@ -54,29 +52,23 @@ const register = async (req, res) => {
   } catch (err) {
     await conn.rollback();
     res.status(500).json({ success: false, message: 'เกิดข้อผิดพลาด: ' + err.message });
-  } finally {
-    conn.release();
-  }
+  } finally { conn.release(); }
 };
 
 const login = async (req, res) => {
   const { user_name, user_password } = req.body;
-
-  if (!user_name || !user_password) {
+  if (!user_name || !user_password)
     return res.status(400).json({ success: false, message: 'กรุณากรอก Username และ Password' });
-  }
 
   try {
     const [users] = await db.query('SELECT * FROM users WHERE user_name = ?', [user_name]);
-    if (users.length === 0) {
+    if (users.length === 0)
       return res.status(401).json({ success: false, message: 'Username หรือ Password ไม่ถูกต้อง' });
-    }
 
     const user = users[0];
     const valid = await bcrypt.compare(user_password, user.user_password);
-    if (!valid) {
+    if (!valid)
       return res.status(401).json({ success: false, message: 'Username หรือ Password ไม่ถูกต้อง' });
-    }
 
     let profile = null;
     if (user.user_role === 'renter') {
@@ -88,14 +80,17 @@ const login = async (req, res) => {
     }
 
     const token = jwt.sign(
-      { user_id: user.user_id, role: user.user_role, profile_id: profile ? (profile.renter_id || profile.staff_id) : null },
+      {
+        user_id: user.user_id,
+        role: user.user_role,
+        profile_id: profile ? (profile.renter_id || profile.staff_id) : null
+      },
       process.env.JWT_SECRET,
       { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
     );
 
     res.json({
-      success: true, message: 'เข้าสู่ระบบสำเร็จ',
-      token,
+      success: true, message: 'เข้าสู่ระบบสำเร็จ', token,
       user: { user_id: user.user_id, user_name: user.user_name, user_role: user.user_role, profile }
     });
   } catch (err) {
@@ -117,7 +112,6 @@ const getMe = async (req, res) => {
       const [rows] = await db.query('SELECT * FROM staff WHERE user_id = ?', [user.user_id]);
       profile = rows[0] || null;
     }
-
     res.json({ success: true, user: { ...user, profile } });
   } catch (err) {
     res.status(500).json({ success: false, message: 'เกิดข้อผิดพลาด' });
